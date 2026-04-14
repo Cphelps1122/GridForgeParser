@@ -13,8 +13,7 @@ from providers import (
 )
 from google_sheets import get_sheet, append_row
 
-# ---- CONFIG ----
-SHEET_ID = "YOUR_GOOGLE_SHEET_ID_HERE"  # <-- replace with your Sheet ID
+SHEET_ID = "105NU3dWQml7sLBpTYbDTZYi2a33MGXJgItvexjjLkLk"
 WORKSHEET_NAME = None  # or "Sheet1"
 
 COLUMNS = [
@@ -51,7 +50,6 @@ PARSER_MAP = {
     "unknown": parse_unknown,
 }
 
-# ---- UI ----
 st.set_page_config(page_title="GridForge Utility Parser", layout="wide")
 st.title("GridForge Utility Parser")
 
@@ -60,7 +58,6 @@ st.write("Upload a utility bill PDF, auto-detect provider, view raw text, review
 uploaded_file = st.file_uploader("Upload PDF", type=["pdf"])
 
 if uploaded_file is not None:
-    # Extract text
     with pdfplumber.open(io.BytesIO(uploaded_file.read())) as pdf:
         pages_text = [page.extract_text() or "" for page in pdf.pages]
     full_text = "\n".join(pages_text)
@@ -68,12 +65,10 @@ if uploaded_file is not None:
     st.subheader("Raw Extracted Text")
     st.text_area("PDF Text", full_text, height=300)
 
-    # Detect provider
     provider_key = detect_provider(full_text)
     st.subheader("Detected Provider")
     st.write(provider_key if provider_key != "unknown" else "Unknown provider (using generic parser)")
 
-    # Parse
     parser = PARSER_MAP.get(provider_key, parse_unknown)
     parsed = parser(full_text)
 
@@ -88,7 +83,6 @@ if uploaded_file is not None:
             value = round(value, 2)
         edited[col_name] = col.text_input(col_name, str(value))
 
-    # Send to Google Sheets
     if st.button("Append Row to Google Sheet"):
         sheet = get_sheet(SHEET_ID, WORKSHEET_NAME)
         row = [edited.get(c, "") for c in COLUMNS]
