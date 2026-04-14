@@ -6,7 +6,10 @@ import streamlit as st
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
 def get_sheet(sheet_id: str, worksheet_name: str = None):
-    # Load JSON from Streamlit secrets
+    # FORCE: Only load from Streamlit secrets
+    if "google" not in st.secrets:
+        raise RuntimeError("Google service account JSON not found in Streamlit secrets")
+
     service_account_info = json.loads(st.secrets["google"]["service_account_json"])
     creds = Credentials.from_service_account_info(service_account_info, scopes=SCOPES)
 
