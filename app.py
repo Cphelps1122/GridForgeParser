@@ -50,50 +50,55 @@ PARSER_MAP = {
 
 # ---- UI ----
 st.set_page_config(page_title="GridForge Utility Parser", layout="wide")
-st.title("GridForge Utility Parser")
+st.title("GridForge Utility Parser — Batch Mode Enabled")
 
-st.write("Upload a utility bill PDF, auto-detect provider, view raw text, review parsed fields, and export to CSV.")
+st.write("Upload one or multiple utility bill PDFs. Each will be parsed and combined into a single CSV export.")
 
-uploaded_file = st.file_uploader("Upload PDF", type=["pdf"])
+uploaded_files = st.file_uploader("Upload PDF(s)", type=["pdf"], accept_multiple_files=True)
 
-if uploaded_file is not None:
-    # Extract text
-    with pdfplumber.open(io.BytesIO(uploaded_file.read())) as pdf:
-        pages_text = [page.extract_text() or "" for page in pdf.pages]
-    full_text = "\n".join(pages_text)
+all_rows = []  # store parsed rows for batch CSV
 
-    st.subheader("Raw Extracted Text")
-    st.text_area("PDF Text", full_text, height=300)
+if uploaded_files:
+    for uploaded_file in uploaded_files:
+        st.subheader(f"Processing: {uploaded_file.name}")
 
-    # Detect provider
-    provider_key = detect_provider(full_text)
-    st.subheader("Detected Provider")
-    st.write(provider_key if provider_key != "unknown" else "Unknown provider (using generic parser)")
+        # Extract text
+        with pdfplumber.open(io.BytesIO(uploaded_file.read())) as pdf:
+            pages_text = [page.extract_text() or "" for page in pdf.pages]
+        full_text = "\n".join(pages_text)
 
-    # Parse
-    parser = PARSER_MAP.get(provider_key, parse_unknown)
-    parsed = parser(full_text)
+        # Detect provider
+        provider_key = detect_provider(full_text)
+        st.write(f"Detected Provider: **{provider_key}**")
 
-    st.subheader("Parsed Fields (Editable)")
-    cols = st.columns(3)
-    edited = {}
+        # Parse
+        parser = PARSER_MAP.get(provider_key, parse_unknown)
+        parsed = parser(full_text)
 
-    for i, col_name in enumerate(COLUMNS):
-        col = cols[i % 3]
-        value = parsed.get(col_name, "")
-        if isinstance(value, float):
-            value = round(value, 2)
-        edited[col_name] = col.text_input(col_name, str(value))
+        # Display parsed fields
+        with st.expander(f"Parsed Fields for {uploaded_file.name}", expanded=False):
+            cols = st.columns(3)
+            edited = {}
 
-    # ---- CSV EXPORT ----
-    st.subheader("Export")
+            for i, col_name in enumerate(COLUMNS):
+                col = cols[i % 3]
+                value = parsed.get(col_name, "")
+                if isinstance(value, float):
+                    value = round(value, 2)
+                edited[col_name] = col.text_input(f"{col_name} ({uploaded_file.name})", str(value))
 
-    df = pd.DataFrame([edited])
+        # Add to batch list
+        all_rows.append(edited)
+
+    # ---- EXPORT ALL AS ONE CSV ----
+    st.subheader("Batch Export")
+
+    df = pd.DataFrame(all_rows)
     csv_bytes = df.to_csv(index=False).encode("utf-8")
 
     st.download_button(
-        label="Download Parsed Bill as CSV",
+        label="Download ALL Parsed Bills as ONE CSV",
         data=csv_bytes,
-        file_name="utility_bill_export.csv",
+        file_name="utility_bills_batch_export.csv",
         mime="text/csv"
     )
